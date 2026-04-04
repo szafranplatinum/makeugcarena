@@ -1,0 +1,58 @@
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  const supabase = createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from('scripts')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data });
+}
+
+export async function POST(request: Request) {
+  const supabase = createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+
+  const { data, error } = await supabase
+    .from('scripts')
+    .insert({
+      user_id: user.id,
+      title: body.title || 'Untitled Script',
+      content: body.content || '',
+      language: body.language || 'en',
+      tone: body.tone || 'professional',
+      word_count: (body.content || '').split(/\s+/).filter(Boolean).length,
+      is_ai_generated: body.isAiGenerated || false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ data }, { status: 201 });
+}
